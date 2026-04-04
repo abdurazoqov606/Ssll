@@ -1,4 +1,4 @@
-name: TopFollow_Ultimate_Patcher
+name: TopFollow_Ultimate_Patcher_Final
 
 on: 
   push:
@@ -19,52 +19,52 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🛠 Install Tools (Fixed)
+      - name: 🛠 Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y zipalign apksigner
-          # Jadx va Apktool'ni qo'lda yuklab olamiz (Repository xatosini chetlab o'tish uchun)
+          sudo apt-get install -y zipalign apksigner python3-pip
+          pip3 install gdown
+          # Apktool yuklash
           curl -L -o apktool.jar "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar"
+          # Jadx yuklash
           curl -L -o jadx.zip "https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip"
           unzip jadx.zip -d jadx_dir
           echo "$(pwd)/jadx_dir/bin" >> $GITHUB_PATH
 
-      - name: 🌐 Download Target APK
+      - name: 🌐 Download Target APK (Fixed with gdown)
         run: |
-          # Google Drive'dan yuklash (Alternative link)
-          curl -L "https://drive.google.com/uc?export=download&id=1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un" -o target.apk
+          # Google Drive-dan faylni to'g'ri yuklash
+          gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
 
       - name: 🔓 Decompile and Patch
         run: |
-          # Java kodlarini ochish
+          # Agar fayl yuklanmagan bo'lsa build to'xtaydi
+          if [ ! -f target.apk ]; then echo "Fayl topilmadi!"; exit 1; fi
+          
+          # Dekompilyatsiya
           jadx -d out_java target.apk
-          # Smali kodlarini ochish
           java -jar apktool.jar d target.apk -o out_apk
           
-          echo "🔍 SSL va Litsenziyani bypass qilish..."
+          echo "🔍 Patching starts..."
           # SSL Pinning Bypass
-          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g'
-          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g'
+          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g' || true
+          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g' || true
           
-          # Litsenziya 'isLicensed' funksiyasini majburiy 'True' qilish
-          # Smali kodida 'return v0' dan oldin 'const/4 v0, 0x1' qo'shamiz
+          # Litsenziyani 'True' qilish
           grep -rl "isLicensed()Z" out_apk | xargs sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g' || true
 
-      - name: 🏗 Build Patched APK
+      - name: 🏗 Build and Sign
         run: |
           java -jar apktool.jar b out_apk -o unaligned.apk
           zipalign -v 4 unaligned.apk aligned.apk
-
-      - name: ✍️ Sign APK
-        run: |
           keytool -genkey -v -keystore test.keystore -alias test -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=AI, O=mkl"
-          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_MOD_Final.apk aligned.apk
+          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_MOD_Fixed.apk aligned.apk
 
-      - name: 📤 Upload Result
+      - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Patched-Files-Result
+          name: Final-Result
           path: |
-            TopFollow_MOD_Final.apk
+            TopFollow_MOD_Fixed.apk
             out_java
             
