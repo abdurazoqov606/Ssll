@@ -1,6 +1,5 @@
 name: 🔍 TopFollow_Encryption_Hunter
 
-# Har bir "push"da va qo'lda ishga tushirish (manual) uchun
 on:
   push:
     branches: [ main ]
@@ -14,38 +13,44 @@ jobs:
       - name: 📥 Repositoryni yuklash
         uses: actions/checkout@v4
 
-      - name: 🛠 Kerakli instrumentlarni sozlash
+      - name: ☕ Java 17 sozlash
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🛠 Instrumentlarni qo'lda o'rnatish (Xatosiz variant)
         run: |
           sudo apt-get update
-          sudo apt-get install -y jadx python3-pip
-          pip3 install gdown
-          # Oxirgi Apktoolni yuklab olish
-          curl -L -o apktool.jar "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar"
+          sudo apt-get install -y python3-pip
+          pip3 install gdown --break-system-packages || pip3 install gdown
+          
+          # JADX ni yuklab olish va sozlash
+          curl -L -o jadx.zip "https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip"
+          unzip jadx.zip -d jadx_dir
+          echo "$(pwd)/jadx_dir/bin" >> $GITHUB_PATH
 
-      - name: 🌐 APKni yuklab olish (Google Drive)
+      - name: 🌐 APKni yuklab olish
         run: |
           gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
 
-      - name: 🔓 Kodni ochish va Shifrlashni qidirish
+      - name: 🔓 Shifrlash sirlarini qidirish
         run: |
           # Java kodiga o'girish
           jadx -d out_java target.apk
           
-          echo "--- 🛡 SHIFRLASHGA ALOQADOR FAYLLAR RO'YXATI ---" > analysis_report.txt
-          # AES, DES, SecretKey, IvParameterSpec kabi shifrlash terminlarini qidirish
-          grep -rlE "AES|DES|SecretKeySpec|IvParameterSpec|XOR|encrypt|decrypt" out_java >> analysis_report.txt
+          echo "--- 🛡 SHIFRLASHGA ALOQADOR FAYLLAR ---" > report.txt
+          grep -rlE "AES|DES|SecretKeySpec|IvParameterSpec|encrypt|decrypt" out_java >> report.txt || true
           
-          echo -e "\n--- 🔑 TOPILGAN MAXFIY KALITLAR (POTENTIAL KEYS) ---" >> analysis_report.txt
-          # Tirnoq ichidagi uzun harf-raqamli satrlarni (kalit bo'lishi mumkin bo'lgan) qidirish
-          grep -rE "\"[A-Za-z0-9+/]{16,}\"" out_java >> analysis_report.txt || true
+          echo -e "\n--- 🔑 TOPILGAN KALITLAR ---" >> report.txt
+          grep -rE "\"[A-Za-z0-9+/]{16,}\"" out_java >> report.txt || true
           
-          echo -e "\n--- 🛰 API REQUEST STRUKTURASI (x1, x4, x9) ---" >> analysis_report.txt
-          # x1, x4, x9 parametrlar qanday yasalayotganini ko'rish
-          grep -rE "put.*\"x1\"" out_java >> analysis_report.txt || true
-          grep -rE "put.*\"x4\"" out_java >> analysis_report.txt || true
+          echo -e "\n--- 🛰 x1 PARAMETR QIDIRUVI ---" >> report.txt
+          grep -r "put.*\"x1\"" out_java >> report.txt || true
 
-      - name: 📤 Natijani yuklash
+      - name: 📤 Hisobotni yuklash
         uses: actions/upload-artifact@v4
         with:
-          name: TopFollow-Deep-Analysis
-          path: analysis_report.txt
+          name: Analysis-Report
+          path: report.txt
+          
