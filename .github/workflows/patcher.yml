@@ -1,72 +1,66 @@
-name: TopFollow Ultimate Decompiler & Patcher
+name: TopFollow_God_Patcher
 
-on:
-  workflow_dispatch: # Qo'lda ishga tushirish uchun
+# Faylni saqlashingiz bilan yoki qo'lda ishga tushirish uchun:
+on: 
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  decompile-patch-build:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: 📥 Repositoryni yuklash
+      - name: 📥 Checkout Code
         uses: actions/checkout@v3
 
-      - name: ☕ Java muhitini sozlash
+      - name: ☕ Setup Java 17
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: 🛠 Kerakli asboblarni o'rnatish
+      - name: 🛠 Install Tools
         run: |
           sudo apt-get update
           sudo apt-get install -y zipalign apksigner jadx
           curl -L -o apktool.jar "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar"
 
-      - name: 🌐 APK faylni yuklab olish
+      - name: 🌐 Download Target APK
         run: |
-          # Google Drive Direct Link (Siz bergan ID asosida)
-          curl -L -o top.apk "https://drive.google.com/uc?id=1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un"
+          # Google Drive Direct Link
+          curl -L -o target.apk "https://drive.google.com/uc?id=1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un"
 
-      - name: 🔓 Dekompilyatsiya (Java va Smali)
+      - name: 🔓 Decompile and Patch
         run: |
-          # Tahlil uchun Java kodlarini ochish
-          jadx -d source_code top.apk
-          # Patch qilish uchun Smali kodlarini ochish
-          java -jar apktool.jar d top.apk -o decoded_apk
-
-      - name: 🛠 MUKAMMAL PATCH (License & Encryption bypass)
-        run: |
-          echo "🔍 Himoyalarni qidirish va yo'q qilish..."
+          # Java kodlarini ochish (Tahlil uchun)
+          jadx -d out_java target.apk
+          # Smali kodlarini ochish (Patch uchun)
+          java -jar apktool.jar d target.apk -o out_apk
           
-          # 1. SSL Pinningni olib tashlash (Reqable hamma narsani ko'rishi uchun)
-          find decoded_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g'
-          find decoded_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g'
+          echo "🔍 SSL va Litsenziyani yo'qotish..."
+          # SSL Pinning Bypass (Har qanday proxy uchun)
+          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g'
+          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g'
           
-          # 2. Litsenziya tekshiruvini 'True' qilish
-          # Bu qatorlar ilova ichidagi 'isLicensed' yoki 'checkUpdate' funksiyalarini doimiy 'ha' qilib qo'yadi
-          find decoded_apk -name "*.smali" -print0 | xargs -0 sed -i 's/return-void/const\/4 v0, 0x1\n    return v0/g'
-          
-          # 3. Loglarni yoqish (Ilova o'zi nima qilayotganini terminalga yozishi uchun)
-          find decoded_apk -name "*.smali" -print0 | xargs -0 sed -i 's/isLoggable(Ljava\/lang\/String;I)Z/const\/4 v0, 0x1\n    return v0/g'
-          
-          echo "✅ Patchlash yakunlandi."
+          # Litsenziya tekshiruvini majburiy 'True' qilish
+          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g'
 
-      - name: 🏗 APKni qayta yig'ish
+      - name: 🏗 Build Patched APK
         run: |
-          java -jar apktool.jar b decoded_apk -o patched_unaligned.apk
+          java -jar apktool.jar b out_apk -o unaligned.apk
+          zipalign -v 4 unaligned.apk aligned.apk
 
-      - name: ✍️ Imzolash (Signing)
+      - name: ✍️ Sign APK
         run: |
-          zipalign -v 4 patched_unaligned.apk patched_aligned.apk
-          keytool -genkey -v -keystore my.keystore -alias mkl -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=AI, O=mkl"
-          apksigner sign --ks my.keystore --ks-pass pass:123456 --out TopFollow_MOD.apk patched_aligned.apk
+          keytool -genkey -v -keystore test.keystore -alias test -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=AI, O=mkl"
+          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_MOD_Final.apk aligned.apk
 
-      - name: 📤 Tayyor APK va Kodlarni saqlash
+      - name: 📤 Upload Result
         uses: actions/upload-artifact@v3
         with:
-          name: TopFollow-Perfect-Mod
+          name: Patched-APK-and-Source
           path: |
-            TopFollow_MOD.apk
-            source_code # Bu yerda o'sha "uzun kodlar"ni o'qishingiz mumkin bo'lgan Java fayllar
-
+            TopFollow_MOD_Final.apk
+            out_java
+            
