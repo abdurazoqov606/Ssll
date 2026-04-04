@@ -1,4 +1,4 @@
-name: TopFollow_SSL_Fixer_Patcher
+name: TopFollow_God_Mode_Final
 
 on: 
   push:
@@ -33,12 +33,12 @@ jobs:
         run: |
           gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
 
-      - name: 🔓 Decompile and Fix SSL Pinning
+      - name: 🔓 Smart Decompile and Patch
         run: |
           java -jar apktool.jar d target.apk -o out_apk
           jadx -d out_java target.apk
 
-          echo "🛠 Network Security Config yaratilmoqda..."
+          echo "🛠 Network Security Config yaratilmoqda (SSL Bypass uchun)..."
           mkdir -p out_apk/res/xml
           cat <<EOT > out_apk/res/xml/network_security_config.xml
           <?xml version="1.0" encoding="utf-8"?>
@@ -55,23 +55,25 @@ jobs:
           echo "📝 Manifestni tahrirlash..."
           # AndroidManifest.xml ichiga networkSecurityConfig qo'shish
           sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config" /' out_apk/AndroidManifest.xml
+          # Debuggable qilish (Reqable yaxshi ishlashi uchun)
+          sed -i 's/<application/<application android:debuggable="true" /' out_apk/AndroidManifest.xml
 
-          echo "🔍 Smali darajasida SSL Pinningni o'chirish..."
-          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g' || true
-          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g' || true
+          echo "🔍 Litsenziyani bypass qilish..."
+          # Faqat ilovaga tegishli joylarni o'zgartiramiz, tizimni emas!
+          grep -rl "isLicensed()Z" out_apk | xargs sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g' || true
 
-      - name: 🏗 Build and Sign
+      - name: 🏗 Build and Sign (Final)
         run: |
           java -jar apktool.jar b out_apk -o unaligned.apk
           zipalign -v 4 unaligned.apk aligned.apk
           keytool -genkey -v -keystore test.keystore -alias test -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=AI, O=mkl"
-          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_SSL_FIXED.apk aligned.apk
+          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_Perfect_Final.apk aligned.apk
 
-      - name: 📤 Upload Result
+      - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SSL-Fixed-APK
+          name: TopFollow-Ultimate-Result
           path: |
-            TopFollow_SSL_FIXED.apk
+            TopFollow_Perfect_Final.apk
             out_java
             
