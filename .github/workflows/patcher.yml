@@ -1,79 +1,38 @@
-name: TopFollow_God_Mode_Final
+name: TopFollow_Deep_Analyzer
 
 on: 
-  push:
-    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  build:
+  analyze:
     runs-on: ubuntu-latest
-
     steps:
-      - name: 📥 Checkout Code
+      - name: 📥 Checkout
         uses: actions/checkout@v4
-
-      - name: ☕ Setup Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
 
       - name: 🛠 Install Tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y zipalign apksigner python3-pip
+          sudo apt-get install -y jadx python3-pip
           pip3 install gdown
-          curl -L -o apktool.jar "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar"
-          curl -L -o jadx.zip "https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip"
-          unzip jadx.zip -d jadx_dir
-          echo "$(pwd)/jadx_dir/bin" >> $GITHUB_PATH
 
-      - name: 🌐 Download Target APK
+      - name: 🌐 Download APK
         run: |
           gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
 
-      - name: 🔓 Smart Decompile and Patch
+      - name: 🔍 Deep Search for Encryption (Shifrlashni qidirish)
         run: |
-          java -jar apktool.jar d target.apk -o out_apk
           jadx -d out_java target.apk
+          echo "--- SHIFRLASHGA ALOQADOR KLASSLAR ---"
+          # 'encrypt', 'decrypt', 'x1', 'x9' so'zlarini barcha Java fayllardan qidiramiz
+          grep -rlE "encrypt|decrypt|x1|x9|AES|RSA" out_java/com/nivaroid/topfollow > findings.txt
+          
+          echo "--- MUHIM FUNKSIYALAR ---"
+          grep -rE "public.*String.*(x1|x4|x9)" out_java >> findings.txt || true
 
-          echo "🛠 Network Security Config yaratilmoqda (SSL Bypass uchun)..."
-          mkdir -p out_apk/res/xml
-          cat <<EOT > out_apk/res/xml/network_security_config.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <network-security-config>
-              <base-config cleartextTrafficPermitted="true">
-                  <trust-anchors>
-                      <certificates src="system" />
-                      <certificates src="user" />
-                  </trust-anchors>
-              </base-config>
-          </network-security-config>
-          EOT
-
-          echo "📝 Manifestni tahrirlash..."
-          # AndroidManifest.xml ichiga networkSecurityConfig qo'shish
-          sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config" /' out_apk/AndroidManifest.xml
-          # Debuggable qilish (Reqable yaxshi ishlashi uchun)
-          sed -i 's/<application/<application android:debuggable="true" /' out_apk/AndroidManifest.xml
-
-          echo "🔍 Litsenziyani bypass qilish..."
-          # Faqat ilovaga tegishli joylarni o'zgartiramiz, tizimni emas!
-          grep -rl "isLicensed()Z" out_apk | xargs sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g' || true
-
-      - name: 🏗 Build and Sign (Final)
-        run: |
-          java -jar apktool.jar b out_apk -o unaligned.apk
-          zipalign -v 4 unaligned.apk aligned.apk
-          keytool -genkey -v -keystore test.keystore -alias test -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=AI, O=mkl"
-          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_Perfect_Final.apk aligned.apk
-
-      - name: 📤 Upload Artifact
+      - name: 📤 Upload Findings
         uses: actions/upload-artifact@v4
         with:
-          name: TopFollow-Ultimate-Result
-          path: |
-            TopFollow_Perfect_Final.apk
-            out_java
-            
+          name: Encryption-Analysis
+          path: findings.txt
+          
