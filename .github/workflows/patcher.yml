@@ -1,4 +1,4 @@
-name: TopFollow_Ultimate_Patcher_Final
+name: TopFollow_SSL_Fixer_Patcher
 
 on: 
   push:
@@ -24,47 +24,54 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y zipalign apksigner python3-pip
           pip3 install gdown
-          # Apktool yuklash
           curl -L -o apktool.jar "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar"
-          # Jadx yuklash
           curl -L -o jadx.zip "https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip"
           unzip jadx.zip -d jadx_dir
           echo "$(pwd)/jadx_dir/bin" >> $GITHUB_PATH
 
-      - name: 🌐 Download Target APK (Fixed with gdown)
+      - name: 🌐 Download Target APK
         run: |
-          # Google Drive-dan faylni to'g'ri yuklash
           gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
 
-      - name: 🔓 Decompile and Patch
+      - name: 🔓 Decompile and Fix SSL Pinning
         run: |
-          # Agar fayl yuklanmagan bo'lsa build to'xtaydi
-          if [ ! -f target.apk ]; then echo "Fayl topilmadi!"; exit 1; fi
-          
-          # Dekompilyatsiya
-          jadx -d out_java target.apk
           java -jar apktool.jar d target.apk -o out_apk
-          
-          echo "🔍 Patching starts..."
-          # SSL Pinning Bypass
+          jadx -d out_java target.apk
+
+          echo "🛠 Network Security Config yaratilmoqda..."
+          mkdir -p out_apk/res/xml
+          cat <<EOT > out_apk/res/xml/network_security_config.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+              <base-config cleartextTrafficPermitted="true">
+                  <trust-anchors>
+                      <certificates src="system" />
+                      <certificates src="user" />
+                  </trust-anchors>
+              </base-config>
+          </network-security-config>
+          EOT
+
+          echo "📝 Manifestni tahrirlash..."
+          # AndroidManifest.xml ichiga networkSecurityConfig qo'shish
+          sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config" /' out_apk/AndroidManifest.xml
+
+          echo "🔍 Smali darajasida SSL Pinningni o'chirish..."
           find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g' || true
           find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g' || true
-          
-          # Litsenziyani 'True' qilish
-          grep -rl "isLicensed()Z" out_apk | xargs sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g' || true
 
       - name: 🏗 Build and Sign
         run: |
           java -jar apktool.jar b out_apk -o unaligned.apk
           zipalign -v 4 unaligned.apk aligned.apk
           keytool -genkey -v -keystore test.keystore -alias test -keyalg RSA -keysize 2048 -validity 10000 -storepass 123456 -keypass 123456 -dname "CN=AI, O=mkl"
-          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_MOD_Fixed.apk aligned.apk
+          apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_SSL_FIXED.apk aligned.apk
 
-      - name: 📤 Upload Artifact
+      - name: 📤 Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: Final-Result
+          name: SSL-Fixed-APK
           path: |
-            TopFollow_MOD_Fixed.apk
+            TopFollow_SSL_FIXED.apk
             out_java
             
