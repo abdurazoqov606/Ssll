@@ -1,38 +1,51 @@
-name: TopFollow_Deep_Analyzer
+name: 🔍 TopFollow_Encryption_Hunter
 
-on: 
+# Har bir "push"da va qo'lda ishga tushirish (manual) uchun
+on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  analyze:
+  deep-scan:
     runs-on: ubuntu-latest
+
     steps:
-      - name: 📥 Checkout
+      - name: 📥 Repositoryni yuklash
         uses: actions/checkout@v4
 
-      - name: 🛠 Install Tools
+      - name: 🛠 Kerakli instrumentlarni sozlash
         run: |
           sudo apt-get update
           sudo apt-get install -y jadx python3-pip
           pip3 install gdown
+          # Oxirgi Apktoolni yuklab olish
+          curl -L -o apktool.jar "https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar"
 
-      - name: 🌐 Download APK
+      - name: 🌐 APKni yuklab olish (Google Drive)
         run: |
           gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
 
-      - name: 🔍 Deep Search for Encryption (Shifrlashni qidirish)
+      - name: 🔓 Kodni ochish va Shifrlashni qidirish
         run: |
+          # Java kodiga o'girish
           jadx -d out_java target.apk
-          echo "--- SHIFRLASHGA ALOQADOR KLASSLAR ---"
-          # 'encrypt', 'decrypt', 'x1', 'x9' so'zlarini barcha Java fayllardan qidiramiz
-          grep -rlE "encrypt|decrypt|x1|x9|AES|RSA" out_java/com/nivaroid/topfollow > findings.txt
           
-          echo "--- MUHIM FUNKSIYALAR ---"
-          grep -rE "public.*String.*(x1|x4|x9)" out_java >> findings.txt || true
+          echo "--- 🛡 SHIFRLASHGA ALOQADOR FAYLLAR RO'YXATI ---" > analysis_report.txt
+          # AES, DES, SecretKey, IvParameterSpec kabi shifrlash terminlarini qidirish
+          grep -rlE "AES|DES|SecretKeySpec|IvParameterSpec|XOR|encrypt|decrypt" out_java >> analysis_report.txt
+          
+          echo -e "\n--- 🔑 TOPILGAN MAXFIY KALITLAR (POTENTIAL KEYS) ---" >> analysis_report.txt
+          # Tirnoq ichidagi uzun harf-raqamli satrlarni (kalit bo'lishi mumkin bo'lgan) qidirish
+          grep -rE "\"[A-Za-z0-9+/]{16,}\"" out_java >> analysis_report.txt || true
+          
+          echo -e "\n--- 🛰 API REQUEST STRUKTURASI (x1, x4, x9) ---" >> analysis_report.txt
+          # x1, x4, x9 parametrlar qanday yasalayotganini ko'rish
+          grep -rE "put.*\"x1\"" out_java >> analysis_report.txt || true
+          grep -rE "put.*\"x4\"" out_java >> analysis_report.txt || true
 
-      - name: 📤 Upload Findings
+      - name: 📤 Natijani yuklash
         uses: actions/upload-artifact@v4
         with:
-          name: Encryption-Analysis
-          path: findings.txt
-          
+          name: TopFollow-Deep-Analysis
+          path: analysis_report.txt
