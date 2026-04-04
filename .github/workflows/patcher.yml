@@ -1,6 +1,5 @@
-name: TopFollow_God_Patcher
+name: TopFollow_God_Patcher_v4
 
-# Faylni saqlashingiz bilan yoki qo'lda ishga tushirish uchun:
 on: 
   push:
     branches: [ main ]
@@ -12,10 +11,10 @@ jobs:
 
     steps:
       - name: 📥 Checkout Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # v4 ga o'zgartirildi
 
       - name: ☕ Setup Java 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4 # v4 ga o'zgartirildi
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -28,23 +27,24 @@ jobs:
 
       - name: 🌐 Download Target APK
         run: |
-          # Google Drive Direct Link
+          # Google Drive Direct Link yuklash (Faylni ochiq qilib qo'yganingizga ishonch hosil qiling)
           curl -L -o target.apk "https://drive.google.com/uc?id=1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un"
 
       - name: 🔓 Decompile and Patch
         run: |
-          # Java kodlarini ochish (Tahlil uchun)
+          # Java kodlarini ochish
           jadx -d out_java target.apk
-          # Smali kodlarini ochish (Patch uchun)
+          # Smali kodlarini ochish
           java -jar apktool.jar d target.apk -o out_apk
           
           echo "🔍 SSL va Litsenziyani yo'qotish..."
-          # SSL Pinning Bypass (Har qanday proxy uchun)
+          # SSL Pinning Bypass
           find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkClientTrusted/checkClientTrusted_patched/g'
           find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/checkServerTrusted/checkServerTrusted_patched/g'
           
-          # Litsenziya tekshiruvini majburiy 'True' qilish
-          find out_apk -name "*.smali" -print0 | xargs -0 sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g'
+          # Litsenziya tekshiruvini doimiy 'True' (1) qilish
+          # Bu qatorlar dekompilyatsiya qilingan har bir faylda isLicensed funksiyasini qidiradi
+          grep -rl "isLicensed()Z" out_apk | xargs sed -i 's/isLicensed()Z/isLicensed()Z\n    const\/4 v0, 0x1\n    return v0/g'
 
       - name: 🏗 Build Patched APK
         run: |
@@ -57,7 +57,7 @@ jobs:
           apksigner sign --ks test.keystore --ks-pass pass:123456 --out TopFollow_MOD_Final.apk aligned.apk
 
       - name: 📤 Upload Result
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4 # SKRINSHOTDAGI XATO SHU YERDA EDI (v4 bo'lishi shart)
         with:
           name: Patched-APK-and-Source
           path: |
