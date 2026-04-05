@@ -1,0 +1,50 @@
+name: 🕵️‍♂️ TopFollow_Code_Extractor
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  extract-code:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: ☕ Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: 🛠 Tools
+        run: |
+          pip3 install gdown --break-system-packages || pip3 install gdown
+          curl -L -o jadx.zip "https://github.com/skylot/jadx/releases/download/v1.4.7/jadx-1.4.7.zip"
+          unzip jadx.zip -d jadx_dir
+          echo "$(pwd)/jadx_dir/bin" >> $GITHUB_PATH
+
+      - name: 🌐 Download & Decompile
+        run: |
+          gdown --id 1hkCK1xdyXMEx99P8pAn2Xl5e8mi9S9Un -O target.apk
+          jadx -d out_java target.apk
+
+      - name: 🎯 Target Files Finder
+        run: |
+          mkdir -p target_files
+          
+          echo "🔍 'x1' va 'x4' ishlatilgan barcha fayllarni nusxalash..."
+          # x1, x4, x9 va AES so'zlari bor fayllarni topib, 'target_files' papkasiga yig'amiz
+          grep -rlE "x1|x4|x9|SecretKey|AES" out_java/com/nivaroid/topfollow | xargs -I {} cp --parents {} target_files/
+          
+          # Agar 'c.java' yoki 'ApiRepository' bo'lsa ularni ham alohida olamiz
+          find out_java -name "c.java" -exec cp --parents {} target_files/ \;
+          find out_java -name "ApiRepository.java" -exec cp --parents {} target_files/ \;
+
+      - name: 📤 Maxfiy Kodlarni Yuklash
+        uses: actions/upload-artifact@v4
+        with:
+          name: TopFollow-Secret-Classes
+          path: target_files
